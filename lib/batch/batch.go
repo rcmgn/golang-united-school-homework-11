@@ -14,36 +14,30 @@ type userCount struct {
 	u []user
 }
 
+type sem struct{}
+
 func getOne(id int64) user {
 	time.Sleep(time.Millisecond * 100)
 	return user{ID: id}
 }
 
 func getBatch(n int64, pool int64) (res []user) {
-	//var lock sync.Mutex
-	//var wg sync.WaitGroup
-	ch := make(chan user, pool)
-	//var r userCount
-	var r []user
+	var wg sync.WaitGroup
+	ch := make(chan sem, pool)
+	var r userCount
 	for i := int64(0); i < n; i++ {
-		//wg.Add(1)
+		wg.Add(1)
+		ch <- struct{}{}
 		go func(i int64) {
 			user := getOne(i)
-			//r.Mutex.Lock()
-			//defer r.Mutex.Unlock()
-			//r.u = append(r.u, user)
-			ch <- user
-			//wg.Done()
+			r.Mutex.Lock()
+			defer r.Mutex.Unlock()
+			r.u = append(r.u, user)
+			<-ch
+			wg.Done()
 		}(i)
 	}
-	//wg.Wait()
-	for i := int64(0); i < n; i++ {
-		var m user
-		m = <-ch
-		//fmt.Println(m)
-		r = append(r, m)
-
-	}
+	wg.Wait()
 	close(ch)
-	return r
+	return r.u
 }
