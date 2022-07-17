@@ -9,11 +9,6 @@ type user struct {
 	ID int64
 }
 
-type userCount struct {
-	sync.Mutex
-	u []user
-}
-
 type sem struct{}
 
 func getOne(id int64) user {
@@ -23,21 +18,22 @@ func getOne(id int64) user {
 
 func getBatch(n int64, pool int64) (res []user) {
 	var wg sync.WaitGroup
+	var mx sync.Mutex
 	ch := make(chan sem, pool)
-	var r userCount
+	var r []user
 	for i := int64(0); i < n; i++ {
 		wg.Add(1)
 		ch <- struct{}{}
 		go func(i int64) {
+			defer wg.Done()
 			user := getOne(i)
-			r.Mutex.Lock()
-			defer r.Mutex.Unlock()
-			r.u = append(r.u, user)
+			mx.Lock()
+			defer mx.Unlock()
+			r = append(r, user)
 			<-ch
-			wg.Done()
 		}(i)
 	}
 	wg.Wait()
 	close(ch)
-	return r.u
+	return r
 }
